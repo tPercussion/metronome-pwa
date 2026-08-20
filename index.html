@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Metronome Pro</title>
+    <title>tMetronome</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#ffc107">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -113,6 +113,31 @@
             color: var(--text-dim);
             font-size: 0.7rem;
         }
+
+        .count-in-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: var(--surface);
+            border-radius: 8px;
+            padding: 8px 12px;
+            margin-bottom: 10px;
+            flex: 0 0 auto;
+        }
+
+        .count-in-row label { color: var(--text-dim); font-size: 0.8rem; }
+        #countInSeconds {
+            width: 72px;
+            background: var(--surface-variant);
+            border: 1px solid transparent;
+            border-radius: 6px;
+            color: var(--text);
+            font: inherit;
+            font-weight: 700;
+            padding: 5px 7px;
+            text-align: center;
+        }
+        #countInDescription { color: var(--text-dim); font-size: 0.78rem; margin-left: auto; }
 
         .btn-nudge {
             background: var(--surface);
@@ -310,7 +335,7 @@
 <body>
 
     <div class="header">
-        <div class="title">Metronome Pro</div>
+        <div class="title">tMetronome</div>
         <div id="flashIndicator" style="width: 12px; height: 12px; border-radius: 50%; background: var(--surface-variant);"></div>
     </div>
 
@@ -352,6 +377,13 @@
         </div>
     </div>
 
+    <div class="count-in-row">
+        <label for="countInSeconds">Précompte</label>
+        <input id="countInSeconds" type="number" min="0" max="600" step="0.1" value="0" inputmode="decimal">
+        <span>s</span>
+        <span id="countInDescription">Aucun précompte</span>
+    </div>
+
     <div class="matrix-container" id="stepMatrix"></div>
 
     <div class="batch-actions">
@@ -382,12 +414,17 @@
         let currentStepIndex = 0;
         let nextNoteTime = 0.0;
         let timerId = null;
+        let countInTimerId = null;
+        let isCountingIn = false;
+        let countInSources = [];
         const lookahead = 25.0; // ms
         const scheduleAheadTime = 0.1; // sec
 
         const bpmInput = document.getElementById('bpmInput');
         const bpmSubtext = document.getElementById('bpmSubtext');
         const mechanicalTempoSlider = document.getElementById('mechanicalTempoSlider');
+        const countInSecondsInput = document.getElementById('countInSeconds');
+        const countInDescription = document.getElementById('countInDescription');
         const numInput = document.getElementById('numeratorInput');
         const denPills = document.querySelectorAll('.den-pill');
         const matrixEl = document.getElementById('stepMatrix');
@@ -410,6 +447,22 @@
             mechanicalTempoSlider.value = closestIndex;
         }
 
+        function countInBeatCount() {
+            const seconds = Math.min(600, Math.max(0, Number(countInSecondsInput.value) || 0));
+            countInSecondsInput.value = seconds;
+            return Math.ceil(seconds * parsedBPM / 60.0);
+        }
+
+        function updateCountInDescription() {
+            const beats = countInBeatCount();
+            if (beats === 0) {
+                countInDescription.textContent = 'Aucun précompte';
+                return;
+            }
+            const duration = beats * 60.0 / parsedBPM;
+            countInDescription.textContent = `${beats} ${beats === 1 ? 'temps' : 'temps'} · ${duration.toFixed(2)} s`;
+        }
+
         function parseBPMString(str) {
             str = str.trim().replace(',', '.');
             const mixedMatch = str.match(/^(\d+)\s+([1-9]\d*)\s*\/\s*([1-9]\d*)$/);
@@ -428,6 +481,7 @@
             parsedBPM = parseBPMString(bpmInput.value);
             bpmSubtext.textContent = `Résolution : ${parsedBPM.toFixed(2)} BPM`;
             syncMechanicalSlider();
+            updateCountInDescription();
         }
 
         function nudgeBPM(delta) {
@@ -435,6 +489,7 @@
             bpmInput.value = (Number.isInteger(parsedBPM)) ? parsedBPM : parsedBPM.toFixed(2);
             bpmSubtext.textContent = `Résolution : ${parsedBPM.toFixed(2)} BPM`;
             syncMechanicalSlider();
+            updateCountInDescription();
         }
 
         function syncNumerator() {
@@ -484,6 +539,7 @@
         });
 
         bpmInput.addEventListener('input', updateBPMFromInput);
+        countInSecondsInput.addEventListener('input', updateCountInDescription);
         mechanicalTempoSlider.addEventListener('input', () => {
             parsedBPM = mechanicalTempoMarks[Number(mechanicalTempoSlider.value)];
             bpmInput.value = parsedBPM.toFixed(2);
@@ -513,6 +569,7 @@
                 osc.start(time);
                 osc.stop(time + 0.025);
             }
+            return osc;
         }
 
         function scheduleStep(stepIdx, time) {
@@ -539,6 +596,39 @@
             timerId = setTimeout(scheduler, lookahead);
         }
 
+        function resetTransportUI() {
+            playBtn.textContent = 'Démarrer';
+            playBtn.classList.remove('running');
+            document.querySelectorAll('.step-block.cursor-active').forEach(b => b.classList.remove('cursor-active'));
+            flash.style.background = 'var(--surface-variant)';
+        }
+
+        function startPattern() {
+            isPlaying = true;
+            playBtn.textContent = 'Arrêter';
+            playBtn.classList.add('running');
+            currentStepIndex = 0;
+            nextNoteTime = audioCtx.currentTime + 0.05;
+            scheduler();
+        }
+
+        function startCountIn(beats) {
+            isCountingIn = true;
+            playBtn.textContent = `Précompte · ${beats} temps — Annuler`;
+            playBtn.classList.add('running');
+            const firstBeatTime = audioCtx.currentTime + 0.05;
+            const secondsPerBeat = 60.0 / parsedBPM;
+            for (let beat = 0; beat < beats; beat++) {
+                countInSources.push(playTone(firstBeatTime + beat * secondsPerBeat, beat === 0 ? 1 : 2));
+            }
+            countInTimerId = setTimeout(() => {
+                if (!isCountingIn) return;
+                isCountingIn = false;
+                countInSources = [];
+                startPattern();
+            }, Math.ceil((0.05 + beats * secondsPerBeat) * 1000));
+        }
+
         playBtn.onclick = async () => {
             if (!audioCtx) {
                 audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -547,19 +637,18 @@
                 await audioCtx.resume();
             }
 
-            isPlaying = !isPlaying;
-            if (isPlaying) {
-                playBtn.textContent = 'Arrêter';
-                playBtn.classList.add('running');
-                currentStepIndex = 0;
-                nextNoteTime = audioCtx.currentTime + 0.05;
-                scheduler();
+            if (!isPlaying && !isCountingIn) {
+                const beats = countInBeatCount();
+                if (beats > 0) startCountIn(beats);
+                else startPattern();
             } else {
-                playBtn.textContent = 'Démarrer';
-                playBtn.classList.remove('running');
+                isPlaying = false;
+                isCountingIn = false;
                 clearTimeout(timerId);
-                document.querySelectorAll('.step-block.cursor-active').forEach(b => b.classList.remove('cursor-active'));
-                flash.style.background = 'var(--surface-variant)';
+                clearTimeout(countInTimerId);
+                countInSources.forEach(source => source?.stop());
+                countInSources = [];
+                resetTransportUI();
             }
         };
 
@@ -620,6 +709,7 @@
         }
 
         updateBPMFromInput();
+        updateCountInDescription();
         renderMatrix();
         refreshPresets();
     </script>

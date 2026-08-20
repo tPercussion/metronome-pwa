@@ -1,6 +1,6 @@
 {
-  "name": "Metronome Pro PWA",
-  "short_name": "Metronome",
+  "name": "tMetronome",
+  "short_name": "tMetronome",
   "start_url": ".",
   "display": "standalone",
   "background_color": "#212121",
