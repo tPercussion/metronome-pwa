@@ -4,7 +4,7 @@
   "start_url": ".",
   "display": "standalone",
   "background_color": "#212121",
-  "theme_color": "#ffc107",
+  "theme_color": "#000000",
   "icons": [
     {
       "src": "https://img.icons8.com/color/512/metronome.png",
