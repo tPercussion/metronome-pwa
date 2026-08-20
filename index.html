@@ -95,6 +95,25 @@
             margin-bottom: 12px;
         }
 
+        .mechanical-tempo {
+            width: 100%;
+            margin: 0 0 12px;
+        }
+
+        #mechanicalTempoSlider {
+            width: 100%;
+            accent-color: var(--primary);
+            cursor: pointer;
+        }
+
+        .mechanical-tempo-labels {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 3px;
+            color: var(--text-dim);
+            font-size: 0.7rem;
+        }
+
         .btn-nudge {
             background: var(--surface);
             color: var(--text);
@@ -311,6 +330,11 @@
         <button class="btn-nudge" onclick="nudgeBPM(1)">+1</button>
     </div>
 
+    <div class="mechanical-tempo">
+        <input id="mechanicalTempoSlider" type="range" aria-label="Tempo mécanique" min="0" max="40" value="24" step="1">
+        <div class="mechanical-tempo-labels"><span>40</span><span>120</span><span>208 BPM</span></div>
+    </div>
+
     <div class="sig-row">
         <div class="num-box">
             <label for="numeratorInput">Pas :</label>
@@ -363,6 +387,7 @@
 
         const bpmInput = document.getElementById('bpmInput');
         const bpmSubtext = document.getElementById('bpmSubtext');
+        const mechanicalTempoSlider = document.getElementById('mechanicalTempoSlider');
         const numInput = document.getElementById('numeratorInput');
         const denPills = document.querySelectorAll('.den-pill');
         const matrixEl = document.getElementById('stepMatrix');
@@ -371,6 +396,19 @@
         const flash = document.getElementById('flashIndicator');
 
         const STORAGE_KEY = 'metronome_pro_v1';
+        const mechanicalTempoMarks = [
+            40, 42, 44, 46, 48, 50, 52, 54, 56, 58, 60, 63, 66, 69,
+            72, 76, 80, 84, 88, 92, 96, 100, 104, 108, 112, 116, 120,
+            126, 132, 138, 144, 152, 160, 168, 176, 184, 192, 200, 208
+        ];
+
+        mechanicalTempoSlider.max = mechanicalTempoMarks.length - 1;
+
+        function syncMechanicalSlider() {
+            const closestIndex = mechanicalTempoMarks.reduce((bestIndex, mark, index) =>
+                Math.abs(mark - parsedBPM) < Math.abs(mechanicalTempoMarks[bestIndex] - parsedBPM) ? index : bestIndex, 0);
+            mechanicalTempoSlider.value = closestIndex;
+        }
 
         function parseBPMString(str) {
             str = str.trim().replace(',', '.');
@@ -389,12 +427,14 @@
         function updateBPMFromInput() {
             parsedBPM = parseBPMString(bpmInput.value);
             bpmSubtext.textContent = `Résolution : ${parsedBPM.toFixed(2)} BPM`;
+            syncMechanicalSlider();
         }
 
         function nudgeBPM(delta) {
             parsedBPM = Math.min(999, Math.max(1, parsedBPM + delta));
             bpmInput.value = (Number.isInteger(parsedBPM)) ? parsedBPM : parsedBPM.toFixed(2);
             bpmSubtext.textContent = `Résolution : ${parsedBPM.toFixed(2)} BPM`;
+            syncMechanicalSlider();
         }
 
         function syncNumerator() {
@@ -444,6 +484,11 @@
         });
 
         bpmInput.addEventListener('input', updateBPMFromInput);
+        mechanicalTempoSlider.addEventListener('input', () => {
+            parsedBPM = mechanicalTempoMarks[Number(mechanicalTempoSlider.value)];
+            bpmInput.value = parsedBPM.toFixed(2);
+            bpmSubtext.textContent = `Réglage mécanique : ${parsedBPM.toFixed(2)} BPM`;
+        });
         numInput.addEventListener('change', syncNumerator);
 
         function playTone(time, type) {
