@@ -4,441 +4,566 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Metronome Pro</title>
-    <!-- Manifeste PWA externe (voir manifest.json) — un data: URI inline est
-         géré de façon inégale par Safari iOS pour "Ajouter à l'écran d'accueil" ;
-         un fichier séparé est plus fiable sur la plateforme visée. -->
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#ffc107">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-
     <style>
         :root {
-            --bg-color: #212121;
-            --text-color: #f5f5f5;
-            --accent-color: #ffc107;
-            --secondary-color: #424242;
-            --strong-color: #ff5252;
-            --weak-color: #03a9f4;
-            --silent-color: #616161;
-            --safe-area-top: env(safe-area-inset-top, 0px);
-            --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+            --bg: #121212;
+            --surface: #1e1e1e;
+            --surface-variant: #2d2d2d;
+            --primary: #ff9800;
+            --strong: #ff3d00;
+            --weak: #00e5ff;
+            --silent: #3a3a3c;
+            --text: #ffffff;
+            --text-dim: #a0a0a0;
         }
-        body {
-            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            margin: 0;
-            padding: calc(10px + var(--safe-area-top)) 15px calc(15px + var(--safe-area-bottom)) 15px;
-            background-color: var(--bg-color);
-            color: var(--text-color);
+
+        * {
+            box-sizing: border-box;
             user-select: none;
             -webkit-user-select: none;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            height: 100vh;
             display: flex;
             flex-direction: column;
-            height: 100vh;
+            padding: env(safe-area-inset-top, 12px) 16px env(safe-area-inset-bottom, 16px) 16px;
             overflow: hidden;
-            box-sizing: border-box;
         }
-        h1 { text-align: center; color: var(--accent-color); margin-top: 0; font-size: 1.5em; }
-        /* BPM Input area */
-        .bpm-container { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 15px; }
-        .bpm-btn {
-            background-color: var(--secondary-color);
-            color: var(--text-color);
-            border: none;
-            border-radius: 50%;
-            width: 40px; height: 40px;
-            font-size: 1.2em; font-weight: bold;
-            cursor: pointer;
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 8px;
         }
+
+        .title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            letter-spacing: 1px;
+            color: var(--primary);
+            text-transform: uppercase;
+        }
+
+        .bpm-display-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            margin: 8px 0;
+        }
+
+        .bpm-input-wrapper {
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+        }
+
         input#bpmInput {
-            background: none;
-            border: 1px solid var(--accent-color);
-            color: var(--accent-color);
-            font-size: 2em;
-            width: 140px;
+            background: transparent;
+            border: none;
+            border-bottom: 2px solid var(--primary);
+            color: var(--text);
+            font-size: 2.6rem;
+            font-weight: 800;
             text-align: center;
-            border-radius: 8px;
-            padding: 5px;
+            width: 220px;
+            outline: none;
         }
-        /* Time Signature area */
-        .sig-container { display: flex; justify-content: space-between; margin-bottom: 15px; }
-        .sig-group { display: flex; align-items: center; gap: 5px; }
-        input#numeratorInput {
-            background: none; border: 1px solid var(--text-color);
-            color: var(--text-color); width: 60px;
-            text-align: center; font-size: 1.2em; border-radius: 4px;
-            padding: 2px;
+
+        .bpm-subtext {
+            font-size: 0.85rem;
+            color: var(--text-dim);
+            font-variant-numeric: tabular-nums;
         }
-        select#denominatorSelect {
-            background: var(--secondary-color); color: var(--text-color);
-            border: none; border-radius: 4px; padding: 2px; font-size: 1.1em;
-        }
-        /* Step Grid - Smartphone optimized */
-        #grid {
-            flex-grow: 1;
+
+        .nudge-grid {
             display: grid;
-            grid-template-columns: repeat(8, 1fr);
-            gap: 4px;
-            overflow-y: auto;
-            margin-bottom: 15px;
-            padding-right: 5px;
-        }
-        .step {
-            aspect-ratio: 1;
-            background-color: var(--secondary-color);
-            border-radius: 4px;
-            cursor: pointer;
-            transition: background 0.1s;
-        }
-        .step.s1 { background-color: var(--strong-color); box-shadow: 0 0 10px var(--strong-color); }
-        .step.s2 { background-color: var(--weak-color); }
-        .step.s0 { background-color: var(--silent-color); }
-        .step.active { border: 2px solid white; }
-        /* Quick Actions */
-        .actions { display: flex; gap: 10px; justify-content: center; margin-bottom: 15px; }
-        .btn-sm {
-            background-color: var(--secondary-color); color: var(--text-color);
-            border: none; border-radius: 4px; padding: 5px 10px; cursor: pointer; font-size: 0.9em;
-        }
-        /* Controls and Presets */
-        .controls { display: flex; gap: 15px; align-items: center; justify-content: center; }
-        #playBtn {
-            background-color: var(--accent-color); color: var(--bg-color);
-            border: none; border-radius: 50%;
-            width: 70px; height: 70px;
-            font-size: 2em; font-weight: bold;
-            cursor: pointer; box-shadow: 0 4px 15px rgba(255,193,7,0.4);
-        }
-        #playBtn.stop { background-color: var(--strong-color); box-shadow: 0 4px 15px rgba(255,82,82,0.4); }
-        .presets-container { flex-grow: 1; max-width: 250px; }
-        select#presetSelect {
+            grid-template-columns: repeat(6, 1fr);
+            gap: 6px;
             width: 100%;
-            background: var(--secondary-color); color: var(--text-color);
-            border: none; border-radius: 4px; padding: 10px; font-size: 1.1em;
+            margin-bottom: 12px;
+        }
+
+        .btn-nudge {
+            background: var(--surface);
+            color: var(--text);
+            border: 1px solid var(--surface-variant);
+            border-radius: 6px;
+            padding: 8px 0;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .btn-nudge:active {
+            background: var(--surface-variant);
+        }
+
+        .sig-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            background: var(--surface);
+            padding: 8px 12px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+
+        .num-box {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .num-box label {
+            font-size: 0.8rem;
+            color: var(--text-dim);
+            text-transform: uppercase;
+        }
+
+        input#numeratorInput {
+            background: var(--surface-variant);
+            border: 1px solid transparent;
+            color: var(--text);
+            font-size: 1.2rem;
+            font-weight: 700;
+            width: 60px;
+            text-align: center;
+            border-radius: 6px;
+            padding: 4px;
+            outline: none;
+        }
+
+        .den-selector {
+            display: flex;
+            gap: 4px;
+            overflow-x: auto;
+            scrollbar-width: none;
+        }
+        .den-selector::-webkit-scrollbar { display: none; }
+
+        .den-pill {
+            background: var(--surface-variant);
+            color: var(--text-dim);
+            border: none;
+            border-radius: 6px;
+            padding: 6px 10px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .den-pill.active {
+            background: var(--primary);
+            color: #000;
+        }
+
+        .matrix-container {
+            flex: 1;
+            background: var(--surface);
+            border-radius: 8px;
+            padding: 10px;
+            overflow-y: auto;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(36px, 1fr));
+            grid-auto-rows: 36px;
+            gap: 6px;
+            align-content: start;
+            margin-bottom: 10px;
+        }
+
+        .step-block {
+            border-radius: 6px;
+            background: var(--silent);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            font-weight: 700;
+            cursor: pointer;
+            position: relative;
+            transition: transform 0.05s ease;
+        }
+
+        .step-block.s1 { background: var(--strong); color: #fff; box-shadow: 0 0 8px rgba(255,61,0,0.5); }
+        .step-block.s2 { background: var(--weak); color: #000; }
+        .step-block.s0 { background: var(--silent); color: var(--text-dim); }
+
+        .step-block.cursor-active {
+            outline: 3px solid #fff;
+            transform: scale(1.08);
+            z-index: 2;
+        }
+
+        .batch-actions {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 10px;
+        }
+
+        .btn-batch {
+            flex: 1;
+            background: var(--surface);
+            border: 1px solid var(--surface-variant);
+            color: var(--text-dim);
+            padding: 8px 4px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .preset-bar {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 12px;
+        }
+
+        select#presetSelect {
+            flex: 1;
+            background: var(--surface);
+            color: var(--text);
+            border: 1px solid var(--surface-variant);
+            border-radius: 6px;
+            padding: 0 8px;
+            font-size: 0.85rem;
+            outline: none;
+        }
+
+        .btn-preset {
+            background: var(--surface-variant);
+            color: var(--text);
+            border: none;
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .btn-play {
+            width: 100%;
+            background: var(--primary);
+            color: #000;
+            border: none;
+            border-radius: 12px;
+            padding: 16px;
+            font-size: 1.3rem;
+            font-weight: 800;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            cursor: pointer;
+            box-shadow: 0 4px 16px rgba(255,152,0,0.3);
+        }
+
+        .btn-play.running {
+            background: var(--strong);
+            color: #fff;
+            box-shadow: 0 4px 16px rgba(255,61,0,0.4);
         }
     </style>
 </head>
 <body>
-    <h1>Metronome Pro</h1>
-    <div class="bpm-container">
-        <button class="bpm-btn" onclick="adjustBPM(-10)">--</button>
-        <button class="bpm-btn" onclick="adjustBPM(-1)">-</button>
-        <input type="text" id="bpmInput" value="120">
-        <button class="bpm-btn" onclick="adjustBPM(1)">+</button>
-        <button class="bpm-btn" onclick="adjustBPM(10)">++</button>
+
+    <div class="header">
+        <div class="title">Metronome Pro</div>
+        <div id="flashIndicator" style="width: 12px; height: 12px; border-radius: 50%; background: var(--surface-variant);"></div>
     </div>
-    <div class="sig-container">
-        <div class="sig-group">
-            <label for="numeratorInput">Mesure:</label>
+
+    <div class="bpm-display-group">
+        <div class="bpm-input-wrapper">
+            <input type="text" id="bpmInput" value="120" autocomplete="off" spellcheck="false">
+        </div>
+        <div class="bpm-subtext" id="bpmSubtext">Résolution : 120.00 BPM</div>
+    </div>
+
+    <div class="nudge-grid">
+        <button class="btn-nudge" onclick="nudgeBPM(-1)">-1</button>
+        <button class="btn-nudge" onclick="nudgeBPM(-0.1)">-0.1</button>
+        <button class="btn-nudge" onclick="nudgeBPM(-0.01)">-0.01</button>
+        <button class="btn-nudge" onclick="nudgeBPM(0.01)">+0.01</button>
+        <button class="btn-nudge" onclick="nudgeBPM(0.1)">+0.1</button>
+        <button class="btn-nudge" onclick="nudgeBPM(1)">+1</button>
+    </div>
+
+    <div class="sig-row">
+        <div class="num-box">
+            <label for="numeratorInput">Pas :</label>
             <input type="number" id="numeratorInput" value="4" min="1" max="999">
         </div>
-        <div class="sig-group">
-            <span>/</span>
-            <select id="denominatorSelect">
-                <option value="1">1</option>
-                <option value="2">2</option>
-                <option value="4" selected>4</option>
-                <option value="8">8</option>
-                <option value="16">16</option>
-                <option value="32">32</option>
-                <option value="64">64</option>
-                <option value="128">128</option>
-            </select>
+        <div class="den-selector" id="denPills">
+            <button class="den-pill" data-val="1">/1</button>
+            <button class="den-pill" data-val="2">/2</button>
+            <button class="den-pill active" data-val="4">/4</button>
+            <button class="den-pill" data-val="8">/8</button>
+            <button class="den-pill" data-val="16">/16</button>
+            <button class="den-pill" data-val="32">/32</button>
+            <button class="den-pill" data-val="64">/64</button>
+            <button class="den-pill" data-val="128">/128</button>
         </div>
     </div>
-    <div id="grid">
-        <!-- Grille générée en JS -->
-    </div>
-    <div class="actions">
-        <button class="btn-sm" onclick="resetGrid(1)">Accent / Beat</button>
-        <button class="btn-sm" onclick="resetGrid(2)">Tout Faible</button>
-        <button class="btn-sm" onclick="resetGrid(0)">Tout Silence</button>
-    </div>
-    <div class="controls">
-        <button id="playBtn">▶</button>
 
-        <div class="presets-container">
-            <select id="presetSelect">
-                <option value="" disabled selected>Mes Presets</option>
-            </select>
-            <div style="display:flex; gap: 5px; margin-top: 5px;">
-                <button class="btn-sm" style="flex:1" onclick="savePreset()">💾 Sauver</button>
-                <button class="btn-sm" style="flex:1" onclick="loadPreset()">📂 Charger</button>
-            </div>
-        </div>
+    <div class="matrix-container" id="stepMatrix"></div>
+
+    <div class="batch-actions">
+        <button class="btn-batch" onclick="batchSet(1)">Accent 1er</button>
+        <button class="btn-batch" onclick="batchSet(2)">Tous Faibles</button>
+        <button class="btn-batch" onclick="batchSet(0)">Tous Silences</button>
     </div>
+
+    <div class="preset-bar">
+        <select id="presetSelect">
+            <option value="" disabled selected>Presets enregistrés</option>
+        </select>
+        <button class="btn-preset" onclick="savePreset()">Sauver</button>
+        <button class="btn-preset" onclick="loadPreset()">Charger</button>
+        <button class="btn-preset" style="color:var(--strong)" onclick="deletePreset()">✕</button>
+    </div>
+
+    <button id="playBtn" class="btn-play">Démarrer</button>
+
     <script>
-        // --- Configuration & États ---
         let audioCtx = null;
-        let strongBuffer, weakBuffer; // Buffers d'échantillons pré-chargés
         let isPlaying = false;
-        let currentStep = 0;
-
-        let rawBPMString = "120";
-        let parsedBPM = 120;
+        let parsedBPM = 120.0;
         let numerator = 4;
         let denominator = 4;
-        let stepsArray = [1, 2, 2, 2]; // 0=Silence, 1=Strong, 2=Weak
-        // Scheduling variables
+        let steps = [1, 2, 2, 2]; // 0=Silence, 1=Strong, 2=Weak
+
+        let currentStepIndex = 0;
         let nextNoteTime = 0.0;
-        const lookaheadTime = 0.05; // 50ms (planification anticipée)
-        const checkIntervalTime = 0.025; // 25ms (fréquence du timer)
-        let schedulerTimerId;
-        // --- DOM Elements ---
+        let timerId = null;
+        const lookahead = 25.0; // ms
+        const scheduleAheadTime = 0.1; // sec
+
         const bpmInput = document.getElementById('bpmInput');
+        const bpmSubtext = document.getElementById('bpmSubtext');
         const numInput = document.getElementById('numeratorInput');
-        const denSelect = document.getElementById('denominatorSelect');
-        const gridDiv = document.getElementById('grid');
+        const denPills = document.querySelectorAll('.den-pill');
+        const matrixEl = document.getElementById('stepMatrix');
         const playBtn = document.getElementById('playBtn');
         const presetSelect = document.getElementById('presetSelect');
-        // --- Initialisation ---
-        window.addEventListener('DOMContentLoaded', () => {
-            loadPresetsList(); // Charge la liste des noms
-            renderGrid();
+        const flash = document.getElementById('flashIndicator');
 
-            // Écouteurs d'input
-            bpmInput.addEventListener('change', updateParameters);
-            numInput.addEventListener('change', updateParameters);
-            denSelect.addEventListener('change', updateParameters);
-            playBtn.addEventListener('click', toggleMetronome);
-        });
-        // --- Initialisation Audio (Nécessite interaction utilisateur) ---
-        async function initAudio() {
-            if (audioCtx) return;
-            audioCtx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'playback' });
+        const STORAGE_KEY = 'metronome_pro_v1';
 
-            // Synthèse et chargement des sons dans des buffers
-            strongBuffer = createClickBuffer(1600, 0.02); // Haut, très court
-            weakBuffer = createClickBuffer(800, 0.015);   // Moyen, plus doux
+        function parseBPMString(str) {
+            str = str.trim().replace(',', '.');
+            const mixedMatch = str.match(/^(\d+)\s+([1-9]\d*)\s*\/\s*([1-9]\d*)$/);
+            if (mixedMatch) {
+                return parseInt(mixedMatch[1]) + (parseInt(mixedMatch[2]) / parseInt(mixedMatch[3]));
+            }
+            const fracMatch = str.match(/^([1-9]\d*)\s*\/\s*([1-9]\d*)$/);
+            if (fracMatch) {
+                return parseInt(fracMatch[1]) / parseInt(fracMatch[2]);
+            }
+            const val = parseFloat(str);
+            return (!isNaN(val) && val > 0 && val <= 999) ? val : 120.0;
         }
-        function createClickBuffer(freq, decay) {
-            const sampleRate = audioCtx.sampleRate;
-            const length = sampleRate * 0.1; // 100ms max
-            const buffer = audioCtx.createBuffer(1, length, sampleRate);
-            const data = buffer.getChannelData(0);
-            for (let i = 0; i < length; i++) {
-                const time = i / sampleRate;
-                const envelope = Math.exp(-time / decay);
-                const val = Math.sin(2 * Math.PI * freq * time);
-                data[i] = val * envelope * (1 - time/(length/sampleRate));
-            }
-            return buffer;
+
+        function updateBPMFromInput() {
+            parsedBPM = parseBPMString(bpmInput.value);
+            bpmSubtext.textContent = `Résolution : ${parsedBPM.toFixed(2)} BPM`;
         }
-        function playSound(buffer, time) {
-            const source = audioCtx.createBufferSource();
-            source.buffer = buffer;
-            const gainNode = audioCtx.createGain();
-            gainNode.gain.setValueAtTime(0.7, time);
-            gainNode.gain.exponentialRampToValueAtTime(0.001, time + buffer.duration);
-            source.connect(gainNode);
-            gainNode.connect(audioCtx.destination);
-            source.start(time);
+
+        function nudgeBPM(delta) {
+            parsedBPM = Math.min(999, Math.max(1, parsedBPM + delta));
+            bpmInput.value = (Number.isInteger(parsedBPM)) ? parsedBPM : parsedBPM.toFixed(2);
+            bpmSubtext.textContent = `Résolution : ${parsedBPM.toFixed(2)} BPM`;
         }
-        // --- Mise à jour des paramètres & Grille ---
-        function updateParameters() {
-            // 1. BPM Parsing
-            rawBPMString = bpmInput.value.trim().replace(',', '.');
-            let matched = false;
-            // Mixed fraction: "120 2/3"
-            const mixedFracMatch = rawBPMString.match(/^(\d+)\s+([1-9]\d*)\s*\/\s*([1-9]\d*)$/);
-            if(mixedFracMatch) {
-                const whole = parseInt(mixedFracMatch[1]);
-                const num = parseInt(mixedFracMatch[2]);
-                const den = parseInt(mixedFracMatch[3]);
-                parsedBPM = whole + (num / den);
-                matched = true;
+
+        function syncNumerator() {
+            let val = parseInt(numInput.value) || 1;
+            val = Math.min(999, Math.max(1, val));
+            numInput.value = val;
+            numerator = val;
+
+            if (steps.length < numerator) {
+                while (steps.length < numerator) steps.push(0);
+            } else if (steps.length > numerator) {
+                steps = steps.slice(0, numerator);
             }
-            // Simple Fraction: "360/3"
-            if(!matched) {
-                const simpleFracMatch = rawBPMString.match(/^([1-9]\d*)\s*\/\s*([1-9]\d*)$/);
-                if(simpleFracMatch) {
-                    parsedBPM = parseInt(simpleFracMatch[1]) / parseInt(simpleFracMatch[2]);
-                    matched = true;
-                }
-            }
-            // Decimal/Integer
-            if(!matched) {
-                const val = parseFloat(rawBPMString);
-                if(!isNaN(val) && val > 0 && val < 1000) {
-                    parsedBPM = val;
-                    matched = true;
-                }
-            }
-            if(!matched) { // Fallback en cas d'erreur
-                bpmInput.value = parsedBPM.toFixed(2);
+            renderMatrix();
+        }
+
+        function renderMatrix() {
+            matrixEl.innerHTML = '';
+            steps.forEach((state, i) => {
+                const el = document.createElement('div');
+                el.className = `step-block s${state}`;
+                el.id = `step-node-${i}`;
+                el.textContent = i + 1;
+                el.onclick = () => {
+                    steps[i] = (steps[i] + 1) % 3;
+                    renderMatrix();
+                };
+                matrixEl.appendChild(el);
+            });
+        }
+
+        function batchSet(mode) {
+            if (mode === 1) {
+                steps = steps.map((_, i) => (i === 0 ? 1 : 2));
             } else {
-                if(isNaN(parseFloat(rawBPMString))) bpmInput.value = parsedBPM.toFixed(2);
+                steps = steps.map(() => mode);
             }
-            // 2. Mesure
-            numerator = parseInt(numInput.value) || 4;
-            if(numerator < 1) numerator = 1;
-            if(numerator > 999) numerator = 999;
-            numInput.value = numerator;
-
-            denominator = parseInt(denSelect.value) || 4;
-            // 3. Grid Adjust (préserver l'état s'il y a de la place, compléter)
-            adjustStepsArray();
-            renderGrid();
+            renderMatrix();
         }
-        function adjustStepsArray() {
-            // Dans ce métronome, bpm = noire (1/4).
-            // Total steps = numerator * (denominator / 4)
-            let neededSteps = numerator * (denominator / 4);
-            if(neededSteps < 1) neededSteps = 1;
-            neededSteps = Math.round(neededSteps); // Sécurité
-            if (stepsArray.length > neededSteps) {
-                stepsArray = stepsArray.slice(0, neededSteps);
-            } else while (stepsArray.length < neededSteps) {
-                stepsArray.push(0); // Complète avec du silence
+
+        denPills.forEach(pill => {
+            pill.onclick = () => {
+                denPills.forEach(p => p.classList.remove('active'));
+                pill.classList.add('active');
+                denominator = parseInt(pill.getAttribute('data-val'));
+            };
+        });
+
+        bpmInput.addEventListener('input', updateBPMFromInput);
+        numInput.addEventListener('change', syncNumerator);
+
+        function playTone(time, type) {
+            if (type === 0) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            if (type === 1) { // Accent Fort
+                osc.frequency.setValueAtTime(1760, time);
+                osc.frequency.exponentialRampToValueAtTime(880, time + 0.03);
+                gain.gain.setValueAtTime(1.0, time);
+                gain.gain.exponentialRampToValueAtTime(0.001, time + 0.035);
+                osc.start(time);
+                osc.stop(time + 0.04);
+            } else if (type === 2) { // Temps Faible
+                osc.frequency.setValueAtTime(880, time);
+                gain.gain.setValueAtTime(0.35, time);
+                gain.gain.exponentialRampToValueAtTime(0.001, time + 0.02);
+                osc.start(time);
+                osc.stop(time + 0.025);
             }
         }
-        function renderGrid() {
-            gridDiv.innerHTML = '';
 
-            // Groupement visuel par beat
-            const stepsPerBeat = denominator / 4;
-            const containerWidth = gridDiv.clientWidth - 10;
-            const columns = Math.min(stepsArray.length, 12);
-            gridDiv.style.gridTemplateColumns = `repeat(${columns}, 1fr)`;
-            stepsArray.forEach((val, index) => {
-                const cell = document.createElement('div');
-                cell.className = `step s${val}`;
-                cell.id = `step-${index}`;
+        function scheduleStep(stepIdx, time) {
+            playTone(time, steps[stepIdx]);
 
-                // Marge visuelle pour les groupes
-                if(stepsPerBeat >= 1 && (index+1) % stepsPerBeat === 0) {
-                    cell.style.marginRight = "6px";
-                }
-                cell.addEventListener('click', () => cycleStepState(index));
-                gridDiv.appendChild(cell);
-            });
+            const delay = Math.max(0, (time - audioCtx.currentTime) * 1000);
+            setTimeout(() => {
+                if (!isPlaying) return;
+                document.querySelectorAll('.step-block.cursor-active').forEach(b => b.classList.remove('cursor-active'));
+                const cur = document.getElementById(`step-node-${stepIdx}`);
+                if (cur) cur.classList.add('cursor-active');
+
+                flash.style.background = steps[stepIdx] === 1 ? 'var(--strong)' : (steps[stepIdx] === 2 ? 'var(--weak)' : 'var(--silent)');
+            }, delay);
         }
-        function cycleStepState(index) {
-            // Cycle: 0(Silence) -> 1(Strong) -> 2(Weak) -> 0
-            stepsArray[index] = (stepsArray[index] + 1) % 3;
-            renderGrid();
+
+        function scheduler() {
+            while (nextNoteTime < audioCtx.currentTime + scheduleAheadTime) {
+                scheduleStep(currentStepIndex, nextNoteTime);
+                const stepSeconds = (60.0 / parsedBPM) * (4.0 / denominator);
+                nextNoteTime += stepSeconds;
+                currentStepIndex = (currentStepIndex + 1) % steps.length;
+            }
+            timerId = setTimeout(scheduler, lookahead);
         }
-        function resetGrid(state) {
-            const stepsPerBeat = denominator / 4;
-            stepsArray = stepsArray.map((_, index) => {
-                if (state === 1) { // Accent/Beat
-                    return (index % stepsPerBeat === 0) ? 1 : 0;
-                }
-                return state;
-            });
-            renderGrid();
-        }
-        function adjustBPM(delta) {
-            let newVal = Math.round(parsedBPM) + delta;
-            if(newVal < 1) newVal = 1;
-            if(newVal > 999) newVal = 999;
-            bpmInput.value = newVal;
-            updateParameters();
-        }
-        // --- Scheduler Engine ---
-        function toggleMetronome() {
-            initAudio(); // Assure l'initialisation au premier clic
+
+        playBtn.onclick = async () => {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                await audioCtx.resume();
+            }
 
             isPlaying = !isPlaying;
             if (isPlaying) {
-                playBtn.textContent = '■';
-                playBtn.classList.add('stop');
-
-                currentStep = 0;
-                nextNoteTime = audioCtx.currentTime;
-                // Lance le timer de planification
-                schedulerTimerId = setInterval(scheduleNotes, checkIntervalTime * 1000);
+                playBtn.textContent = 'Arrêter';
+                playBtn.classList.add('running');
+                currentStepIndex = 0;
+                nextNoteTime = audioCtx.currentTime + 0.05;
+                scheduler();
             } else {
-                playBtn.textContent = '▶';
-                playBtn.classList.remove('stop');
-
-                clearInterval(schedulerTimerId);
-                // Efface la surbrillance active
-                document.querySelectorAll('.step.active').forEach(e => e.classList.remove('active'));
+                playBtn.textContent = 'Démarrer';
+                playBtn.classList.remove('running');
+                clearTimeout(timerId);
+                document.querySelectorAll('.step-block.cursor-active').forEach(b => b.classList.remove('cursor-active'));
+                flash.style.background = 'var(--surface-variant)';
             }
-        }
-        function scheduleNotes() {
-            // Planifie les notes jusqu'à la fin de la fenêtre de lookahead
-            while (nextNoteTime < audioCtx.currentTime + lookaheadTime) {
-                scheduleNote(currentStep, nextNoteTime);
-                advanceNote();
-            }
-        }
-        function advanceNote() {
-            // Calcul du temps exact d'un step : bpm est la noire(1/4)
-            // stepDuration = (60 / parsedBPM) / (denominator / 4)
-            const secondsPerBeat = 60.0 / parsedBPM;
-            const stepsPerBeat = denominator / 4;
-            const stepDuration = secondsPerBeat / stepsPerBeat;
-            nextNoteTime += stepDuration;
-            // Prochain index de pas
-            currentStep = (currentStep + 1) % stepsArray.length;
-        }
-        function scheduleNote(stepIndex, time) {
-            const state = stepsArray[stepIndex];
+        };
 
-            // 1. Play Sound
-            if (state === 1) playSound(strongBuffer, time);
-            else if (state === 2) playSound(weakBuffer, time);
-            // 2. Trigger Visual Flash (dans le thread principal JS au bon moment)
-            const flashDelay = (time - audioCtx.currentTime) * 1000;
-
-            setTimeout(() => {
-                // S'assure que le métronome tourne toujours avant de flash
-                if(!isPlaying) return;
-                // Efface le précédent
-                document.querySelectorAll('.step.active').forEach(e => e.classList.remove('active'));
-
-                // Active le nouveau
-                const cell = document.getElementById(`step-${stepIndex}`);
-                if(cell) cell.classList.add('active');
-            }, Math.max(0, flashDelay - 10)); // Un peu d'anticipation pour le DOM
-        }
-        // --- Preset Management ---
-        const PRESETS_KEY = 'metronome_pwa_presets';
-        function loadPresetsList() {
-            const data = localStorage.getItem(PRESETS_KEY);
-            const presets = data ? JSON.parse(data) : {};
-
-            presetSelect.innerHTML = '<option value="" disabled selected>Mes Presets</option>';
-            Object.keys(presets).sort().forEach(name => {
+        function refreshPresets() {
+            const data = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+            presetSelect.innerHTML = '<option value="" disabled selected>Presets enregistrés</option>';
+            Object.keys(data).forEach(k => {
                 const opt = document.createElement('option');
-                opt.value = name; opt.textContent = name;
+                opt.value = k;
+                opt.textContent = k;
                 presetSelect.appendChild(opt);
             });
         }
+
         function savePreset() {
-            let name = prompt("Nom du preset :", `Tempo ${parsedBPM.toFixed(1)} ${numerator}/${denominator}`);
-            if(!name) return;
-            name = name.trim();
-            const presets = JSON.parse(localStorage.getItem(PRESETS_KEY) || '{}');
-            presets[name] = {
-                bpmString: bpmInput.value, // Sauvegarde la chaîne originale (ex: "120 2/3")
-                parsedBPM: parsedBPM,
+            const name = prompt('Nom du preset :', `${bpmInput.value} BPM - ${numerator}/${denominator}`);
+            if (!name) return;
+            const data = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+            data[name] = {
+                bpmStr: bpmInput.value,
                 numerator: numerator,
                 denominator: denominator,
-                steps: [...stepsArray] // Deep copy
+                steps: [...steps]
             };
-            localStorage.setItem(PRESETS_KEY, JSON.stringify(presets));
-            loadPresetsList();
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+            refreshPresets();
             presetSelect.value = name;
-            alert("Preset sauvegardé.");
         }
+
         function loadPreset() {
-            const name = presetSelect.value;
-            if(!name) return;
-            const presets = JSON.parse(localStorage.getItem(PRESETS_KEY) || '{}');
-            const data = presets[name];
-            if(!data) return;
-            // Chargement des états
-            bpmInput.value = data.bpmString || data.parsedBPM;
-            numInput.value = data.numerator;
-            denSelect.value = data.denominator;
-            stepsArray = data.steps;
-            // Application
-            if(isPlaying) toggleMetronome(); // Stop si tourne
-            updateParameters(); // Reload grid
+            const k = presetSelect.value;
+            if (!k) return;
+            const data = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}')[k];
+            if (!data) return;
+
+            bpmInput.value = data.bpmStr;
+            updateBPMFromInput();
+            numerator = data.numerator;
+            numInput.value = numerator;
+            denominator = data.denominator;
+
+            denPills.forEach(p => {
+                if (parseInt(p.getAttribute('data-val')) === denominator) p.classList.add('active');
+                else p.classList.remove('active');
+            });
+
+            steps = [...data.steps];
+            renderMatrix();
         }
+
+        function deletePreset() {
+            const k = presetSelect.value;
+            if (!k || !confirm(`Supprimer le preset "${k}" ?`)) return;
+            const data = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+            delete data[k];
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+            refreshPresets();
+        }
+
+        updateBPMFromInput();
+        renderMatrix();
+        refreshPresets();
     </script>
 </body>
 </html>
